@@ -9,6 +9,8 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+__version__ = "0.0.1"
+
 from typing import NamedTuple
 import torch.nn as nn
 import torch
