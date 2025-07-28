@@ -1,16 +1,5 @@
-/*
- * Copyright (C) 2023, Inria
- * GRAPHDECO research group, https://team.inria.fr/graphdeco
- * All rights reserved.
- *
- * This software is free for non-commercial, research and evaluation use 
- * under the terms of the LICENSE.md file.
- *
- * For inquiries contact  george.drettakis@inria.fr
- */
-
-#ifndef CUDA_RASTERIZER_AUXILIARY_H_INCLUDED
-#define CUDA_RASTERIZER_AUXILIARY_H_INCLUDED
+#ifndef CUDA_RASTERIZER_AUXILIARY_H
+#define CUDA_RASTERIZER_AUXILIARY_H
 
 #include "config.h"
 #include "stdio.h"
@@ -37,13 +26,16 @@ __device__ const float SH_C3[] = {
 	-0.5900435899266435f
 };
 
-__forceinline__ __device__ float ndc2Pix(float v, int S)
-{
+__forceinline__ __device__ float ndc2Pix(const float v,
+                                         const int S) {
 	return ((v + 1.0) * S - 1.0) * 0.5;
 }
 
-__forceinline__ __device__ void getRect(const float2 p, int max_radius, uint2& rect_min, uint2& rect_max, dim3 grid)
-{
+__forceinline__ __device__ void getRect(const float2 p,
+                                        const int max_radius,
+                                        uint2& rect_min,
+                                        uint2& rect_max,
+                                        const dim3 grid) {
 	rect_min = {
 		min(grid.x, max((int)0, (int)((p.x - max_radius) / BLOCK_X))),
 		min(grid.y, max((int)0, (int)((p.y - max_radius) / BLOCK_Y)))
@@ -54,8 +46,11 @@ __forceinline__ __device__ void getRect(const float2 p, int max_radius, uint2& r
 	};
 }
 
-__forceinline__ __device__ void getRect(const float2 p, int2 ext_rect, uint2& rect_min, uint2& rect_max, dim3 grid)
-{
+__forceinline__ __device__ void getRect(const float2 p,
+                                        const int2 ext_rect,
+                                        uint2& rect_min,
+                                        uint2& rect_max,
+                                        const dim3 grid) {
 	rect_min = {
 		min(grid.x, max((int)0, (int)((p.x - ext_rect.x) / BLOCK_X))),
 		min(grid.y, max((int)0, (int)((p.y - ext_rect.y) / BLOCK_Y)))
@@ -67,8 +62,8 @@ __forceinline__ __device__ void getRect(const float2 p, int2 ext_rect, uint2& re
 }
 
 
-__forceinline__ __device__ float3 transformPoint4x3(const float3& p, const float* matrix)
-{
+__forceinline__ __device__ float3 transformPoint4x3(const float3& p,
+                                                    const float* matrix) {
 	float3 transformed = {
 		matrix[0] * p.x + matrix[4] * p.y + matrix[8] * p.z + matrix[12],
 		matrix[1] * p.x + matrix[5] * p.y + matrix[9] * p.z + matrix[13],
@@ -77,8 +72,8 @@ __forceinline__ __device__ float3 transformPoint4x3(const float3& p, const float
 	return transformed;
 }
 
-__forceinline__ __device__ float4 transformPoint4x4(const float3& p, const float* matrix)
-{
+__forceinline__ __device__ float4 transformPoint4x4(const float3& p,
+                                                    const float* matrix) {
 	float4 transformed = {
 		matrix[0] * p.x + matrix[4] * p.y + matrix[8] * p.z + matrix[12],
 		matrix[1] * p.x + matrix[5] * p.y + matrix[9] * p.z + matrix[13],
@@ -88,8 +83,8 @@ __forceinline__ __device__ float4 transformPoint4x4(const float3& p, const float
 	return transformed;
 }
 
-__forceinline__ __device__ float3 transformVec4x3(const float3& p, const float* matrix)
-{
+__forceinline__ __device__ float3 transformVec4x3(const float3& p,
+                                                  const float* matrix) {
 	float3 transformed = {
 		matrix[0] * p.x + matrix[4] * p.y + matrix[8] * p.z,
 		matrix[1] * p.x + matrix[5] * p.y + matrix[9] * p.z,
@@ -98,8 +93,8 @@ __forceinline__ __device__ float3 transformVec4x3(const float3& p, const float* 
 	return transformed;
 }
 
-__forceinline__ __device__ float3 transformVec4x3Transpose(const float3& p, const float* matrix)
-{
+__forceinline__ __device__ float3 transformVec4x3Transpose(const float3& p,
+                                                           const float* matrix) {
 	float3 transformed = {
 		matrix[0] * p.x + matrix[1] * p.y + matrix[2] * p.z,
 		matrix[4] * p.x + matrix[5] * p.y + matrix[6] * p.z,
@@ -108,16 +103,16 @@ __forceinline__ __device__ float3 transformVec4x3Transpose(const float3& p, cons
 	return transformed;
 }
 
-__forceinline__ __device__ float dnormvdz(float3 v, float3 dv)
-{
+__forceinline__ __device__ float dnormvdz(float3 v,
+                                          float3 dv) {
 	float sum2 = v.x * v.x + v.y * v.y + v.z * v.z;
 	float invsum32 = 1.0f / sqrt(sum2 * sum2 * sum2);
 	float dnormvdz = (-v.x * v.z * dv.x - v.y * v.z * dv.y + (sum2 - v.z * v.z) * dv.z) * invsum32;
 	return dnormvdz;
 }
 
-__forceinline__ __device__ float3 dnormvdv(float3 v, float3 dv)
-{
+__forceinline__ __device__ float3 dnormvdv(float3 v,
+                                           float3 dv) {
 	float sum2 = v.x * v.x + v.y * v.y + v.z * v.z;
 	float invsum32 = 1.0f / sqrt(sum2 * sum2 * sum2);
 
@@ -128,8 +123,8 @@ __forceinline__ __device__ float3 dnormvdv(float3 v, float3 dv)
 	return dnormvdv;
 }
 
-__forceinline__ __device__ float4 dnormvdv(float4 v, float4 dv)
-{
+__forceinline__ __device__ float4 dnormvdv(float4 v,
+                                           float4 dv) {
 	float sum2 = v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w;
 	float invsum32 = 1.0f / sqrt(sum2 * sum2 * sum2);
 
@@ -143,18 +138,17 @@ __forceinline__ __device__ float4 dnormvdv(float4 v, float4 dv)
 	return dnormvdv;
 }
 
-__forceinline__ __device__ float sigmoid(float x)
+__forceinline__ __device__ float sigmoid(const float x)
 {
 	return 1.0f / (1.0f + expf(-x));
 }
 
-__forceinline__ __device__ bool in_frustum(int idx,
-	const float* orig_points,
-	const float* viewmatrix,
-	const float* projmatrix,
-	bool prefiltered,
-	float3& p_view)
-{
+__forceinline__ __device__ bool in_frustum(const int idx,
+	                                       const float* orig_points,
+	                                       const float* viewmatrix,
+	                                       const float* projmatrix,
+	                                       const bool prefiltered,
+	                                       float3& p_view) {
 	float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
 
 	// Bring points to screen space
@@ -184,4 +178,4 @@ throw std::runtime_error(cudaGetErrorString(ret)); \
 } \
 }
 
-#endif
+#endif  // CUDA_RASTERIZER_AUXILIARY_H

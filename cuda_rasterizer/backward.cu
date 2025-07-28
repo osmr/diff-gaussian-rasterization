@@ -1,14 +1,3 @@
-/*
- * Copyright (C) 2023, Inria
- * GRAPHDECO research group, https://team.inria.fr/graphdeco
- * All rights reserved.
- *
- * This software is free for non-commercial, research and evaluation use 
- * under the terms of the LICENSE.md file.
- *
- * For inquiries contact  george.drettakis@inria.fr
- */
-
 #include "backward.h"
 #include "auxiliary.h"
 #include <cooperative_groups.h>
@@ -20,8 +9,16 @@ __device__ __forceinline__ float sq(float x) { return x * x; }
 
 // Backward pass for conversion of spherical harmonics to RGB for
 // each Gaussian.
-__device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::vec3* means, glm::vec3 campos, const float* shs, const bool* clamped, const glm::vec3* dL_dcolor, glm::vec3* dL_dmeans, glm::vec3* dL_dshs)
-{
+__device__ void computeColorFromSH(int idx,
+                                   int deg,
+                                   int max_coeffs,
+                                   const glm::vec3* means,
+                                   glm::vec3 campos,
+                                   const float* shs,
+                                   const bool* clamped,
+                                   const glm::vec3* dL_dcolor,
+                                   glm::vec3* dL_dmeans,
+                                   glm::vec3* dL_dshs) {
 	// Compute intermediate values, as it is done during forward
 	glm::vec3 pos = means[idx];
 	glm::vec3 dir_orig = pos - campos;
@@ -144,21 +141,22 @@ __device__ void computeColorFromSH(int idx, int deg, int max_coeffs, const glm::
 // Backward version of INVERSE 2D covariance matrix computation
 // (due to length launched as separate kernel before other 
 // backward steps contained in preprocess)
-__global__ void computeCov2DCUDA(int P,
-	const float3* means,
-	const int* radii,
-	const float* cov3Ds,
-	const float h_x, float h_y,
-	const float tan_fovx, float tan_fovy,
-	const float* view_matrix,
-	const float* opacities,
-	const float* dL_dconics,
-	float* dL_dopacity,
-	const float* dL_dinvdepth,
-	float3* dL_dmeans,
-	float* dL_dcov,
-	bool antialiasing)
-{
+__global__ void computeCov2DCUDA(const int P,
+	                             const float3* means,
+	                             const int* radii,
+	                             const float* cov3Ds,
+	                             const float h_x,
+	                             const float h_y,
+	                             const float tan_fovx,
+	                             const float tan_fovy,
+	                             const float* view_matrix,
+	                             const float* opacities,
+	                             const float* dL_dconics,
+	                             float* dL_dopacity,
+	                             const float* dL_dinvdepth,
+	                             float3* dL_dmeans,
+	                             float* dL_dcov,
+	                             bool antialiasing) {
 	auto idx = cg::this_grid().thread_rank();
 	if (idx >= P || !(radii[idx] > 0))
 		return;
@@ -327,8 +325,13 @@ __global__ void computeCov2DCUDA(int P,
 
 // Backward pass for the conversion of scale and rotation to a 
 // 3D covariance matrix for each Gaussian. 
-__device__ void computeCov3D(int idx, const glm::vec3 scale, float mod, const glm::vec4 rot, const float* dL_dcov3Ds, glm::vec3* dL_dscales, glm::vec4* dL_drots)
-{
+__device__ void computeCov3D(int idx,
+                             const glm::vec3 scale,
+                             float mod,
+                             const glm::vec4 rot,
+                             const float* dL_dcov3Ds,
+                             glm::vec3* dL_dscales,
+                             glm::vec4* dL_drots) {
 	// Recompute (intermediate) results for the 3D covariance computation.
 	glm::vec4 q = rot;// / glm::length(rot);
 	float r = q.x;
@@ -396,26 +399,26 @@ __device__ void computeCov3D(int idx, const glm::vec3 scale, float mod, const gl
 // for the covariance computation and inversion
 // (those are handled by a previous kernel call)
 template<int C>
-__global__ void preprocessCUDA(
-	int P, int D, int M,
-	const float3* means,
-	const int* radii,
-	const float* shs,
-	const bool* clamped,
-	const glm::vec3* scales,
-	const glm::vec4* rotations,
-	const float scale_modifier,
-	const float* proj,
-	const glm::vec3* campos,
-	const float3* dL_dmean2D,
-	glm::vec3* dL_dmeans,
-	float* dL_dcolor,
-	float* dL_dcov3D,
-	float* dL_dsh,
-	glm::vec3* dL_dscale,
-	glm::vec4* dL_drot,
-	float* dL_dopacity)
-{
+__global__ void preprocessCUDA(int P,
+                               int D,
+                               int M,
+                               const float3* means,
+	                           const int* radii,
+	                           const float* shs,
+	                           const bool* clamped,
+	                           const glm::vec3* scales,
+	                           const glm::vec4* rotations,
+	                           const float scale_modifier,
+	                           const float* proj,
+	                           const glm::vec3* campos,
+	                           const float3* dL_dmean2D,
+	                           glm::vec3* dL_dmeans,
+	                           float* dL_dcolor,
+	                           float* dL_dcov3D,
+	                           float* dL_dsh,
+	                           glm::vec3* dL_dscale,
+	                           glm::vec4* dL_drot,
+	                           float* dL_dopacity) {
 	auto idx = cg::this_grid().thread_rank();
 	if (idx >= P || !(radii[idx] > 0))
 		return;
@@ -450,27 +453,24 @@ __global__ void preprocessCUDA(
 
 // Backward version of the rendering procedure.
 template <uint32_t C>
-__global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
-renderCUDA(
-	const uint2* __restrict__ ranges,
-	const uint32_t* __restrict__ point_list,
-	int W, int H,
-	const float* __restrict__ bg_color,
-	const float2* __restrict__ points_xy_image,
-	const float4* __restrict__ conic_opacity,
-	const float* __restrict__ colors,
-	const float* __restrict__ depths,
-	const float* __restrict__ final_Ts,
-	const uint32_t* __restrict__ n_contrib,
-	const float* __restrict__ dL_dpixels,
-	const float* __restrict__ dL_invdepths,
-	float3* __restrict__ dL_dmean2D,
-	float4* __restrict__ dL_dconic2D,
-	float* __restrict__ dL_dopacity,
-	float* __restrict__ dL_dcolors,
-	float* __restrict__ dL_dinvdepths
-)
-{
+__global__ void __launch_bounds__(BLOCK_X * BLOCK_Y) renderCUDA(const uint2* __restrict__ ranges,
+	                                                            const uint32_t* __restrict__ point_list,
+	                                                            int W,
+	                                                            int H,
+	                                                            const float* __restrict__ bg_color,
+	                                                            const float2* __restrict__ points_xy_image,
+	                                                            const float4* __restrict__ conic_opacity,
+	                                                            const float* __restrict__ colors,
+	                                                            const float* __restrict__ depths,
+	                                                            const float* __restrict__ final_Ts,
+	                                                            const uint32_t* __restrict__ n_contrib,
+	                                                            const float* __restrict__ dL_dpixels,
+	                                                            const float* __restrict__ dL_invdepths,
+	                                                            float3* __restrict__ dL_dmean2D,
+	                                                            float4* __restrict__ dL_dconic2D,
+	                                                            float* __restrict__ dL_dopacity,
+	                                                            float* __restrict__ dL_dcolors,
+	                                                            float* __restrict__ dL_dinvdepths) {
 	// We rasterize again. Compute necessary block info.
 	auto block = cg::this_thread_block();
 	const uint32_t horizontal_blocks = (W + BLOCK_X - 1) / BLOCK_X;
@@ -528,8 +528,7 @@ renderCUDA(
 	const float ddely_dy = 0.5 * H;
 
 	// Traverse all Gaussians
-	for (int i = 0; i < rounds; i++, toDo -= BLOCK_SIZE)
-	{
+	for (int i = 0; i < rounds; i++, toDo -= BLOCK_SIZE) {
 		// Load auxiliary data into shared memory, start in the BACK
 		// and load them in revers order.
 		block.sync();
@@ -549,8 +548,7 @@ renderCUDA(
 		block.sync();
 
 		// Iterate over Gaussians
-		for (int j = 0; !done && j < min(BLOCK_SIZE, toDo); j++)
-		{
+		for (int j = 0; !done && j < min(BLOCK_SIZE, toDo); j++) {
 			// Keep track of current Gaussian ID. Skip, if this one
 			// is behind the last contributor for this pixel.
 			contributor--;
@@ -594,13 +592,12 @@ renderCUDA(
 			}
 			// Propagate gradients from inverse depth to alphaas and
 			// per Gaussian inverse depths
-			if (dL_dinvdepths)
-			{
-			const float invd = 1.f / collected_depths[j];
-			accum_invdepth_rec = last_alpha * last_invdepth + (1.f - last_alpha) * accum_invdepth_rec;
-			last_invdepth = invd;
-			dL_dalpha += (invd - accum_invdepth_rec) * dL_invdepth;
-			atomicAdd(&(dL_dinvdepths[global_id]), dchannel_dcolor * dL_invdepth);
+			if (dL_dinvdepths) {
+			    const float invd = 1.f / collected_depths[j];
+			    accum_invdepth_rec = last_alpha * last_invdepth + (1.f - last_alpha) * accum_invdepth_rec;
+			    last_invdepth = invd;
+			    dL_dalpha += (invd - accum_invdepth_rec) * dL_invdepth;
+			    atomicAdd(&(dL_dinvdepths[global_id]), dchannel_dcolor * dL_invdepth);
 			}
 
 			dL_dalpha *= T;
@@ -637,34 +634,36 @@ renderCUDA(
 	}
 }
 
-void BACKWARD::preprocess(
-	int P, int D, int M,
-	const float3* means3D,
-	const int* radii,
-	const float* shs,
-	const bool* clamped,
-	const float* opacities,
-	const glm::vec3* scales,
-	const glm::vec4* rotations,
-	const float scale_modifier,
-	const float* cov3Ds,
-	const float* viewmatrix,
-	const float* projmatrix,
-	const float focal_x, float focal_y,
-	const float tan_fovx, float tan_fovy,
-	const glm::vec3* campos,
-	const float3* dL_dmean2D,
-	const float* dL_dconic,
-	const float* dL_dinvdepth,
-	float* dL_dopacity,
-	glm::vec3* dL_dmean3D,
-	float* dL_dcolor,
-	float* dL_dcov3D,
-	float* dL_dsh,
-	glm::vec3* dL_dscale,
-	glm::vec4* dL_drot,
-	bool antialiasing)
-{
+void BACKWARD::preprocess(const int P,
+                          const int D,
+                          const int M,
+	                      const float3* means3D,
+	                      const int* radii,
+	                      const float* shs,
+	                      const bool* clamped,
+	                      const float* opacities,
+	                      const glm::vec3* scales,
+	                      const glm::vec4* rotations,
+	                      const float scale_modifier,
+	                      const float* cov3Ds,
+	                      const float* viewmatrix,
+	                      const float* projmatrix,
+	                      const float focal_x,
+	                      const float focal_y,
+	                      const float tan_fovx,
+	                      const float tan_fovy,
+	                      const glm::vec3* campos,
+	                      const float3* dL_dmean2D,
+	                      const float* dL_dconic,
+	                      const float* dL_dinvdepth,
+	                      float* dL_dopacity,
+	                      glm::vec3* dL_dmean3D,
+	                      float* dL_dcolor,
+	                      float* dL_dcov3D,
+	                      float* dL_dsh,
+	                      glm::vec3* dL_dscale,
+	                      glm::vec4* dL_drot,
+	                      bool antialiasing) {
 	// Propagate gradients for the path of 2D conic matrix computation. 
 	// Somewhat long, thus it is its own kernel rather than being part of 
 	// "preprocess". When done, loss gradient w.r.t. 3D means has been
@@ -711,26 +710,26 @@ void BACKWARD::preprocess(
 		dL_dopacity);
 }
 
-void BACKWARD::render(
-	const dim3 grid, const dim3 block,
-	const uint2* ranges,
-	const uint32_t* point_list,
-	int W, int H,
-	const float* bg_color,
-	const float2* means2D,
-	const float4* conic_opacity,
-	const float* colors,
-	const float* depths,
-	const float* final_Ts,
-	const uint32_t* n_contrib,
-	const float* dL_dpixels,
-	const float* dL_invdepths,
-	float3* dL_dmean2D,
-	float4* dL_dconic2D,
-	float* dL_dopacity,
-	float* dL_dcolors,
-	float* dL_dinvdepths)
-{
+void BACKWARD::render(const dim3 grid,
+                      const dim3 block,
+	                  const uint2* ranges,
+	                  const uint32_t* point_list,
+	                  int W,
+	                  int H,
+	                  const float* bg_color,
+	                  const float2* means2D,
+	                  const float4* conic_opacity,
+	                  const float* colors,
+	                  const float* depths,
+	                  const float* final_Ts,
+	                  const uint32_t* n_contrib,
+	                  const float* dL_dpixels,
+	                  const float* dL_invdepths,
+	                  float3* dL_dmean2D,
+	                  float4* dL_dconic2D,
+	                  float* dL_dopacity,
+	                  float* dL_dcolors,
+	                  float* dL_dinvdepths) {
 	renderCUDA<NUM_CHANNELS> << <grid, block >> >(
 		ranges,
 		point_list,
@@ -748,6 +747,5 @@ void BACKWARD::render(
 		dL_dconic2D,
 		dL_dopacity,
 		dL_dcolors,
-		dL_dinvdepths
-		);
+		dL_dinvdepths);
 }
